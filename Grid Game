@@ -1,0 +1,1671 @@
+function startGame(gameName) {
+    alert(`Starting ${gameName}!`);
+    if (gameName === 'tictactoe') {
+      window.location.href = 'tictactoe.html';
+    }
+    else if (gameName === 'snake') {
+      window.location.href = 'Snake.html';
+    }
+    else if (gameName === 'whackAMole') {
+      window.location.href = 'Whack_mole.html';
+    }
+    else if (gameName === 'maze') {
+      window.location.href = 'maze.html';
+    }
+    else if (gameName === 'crossRoad') {
+      window.location.href = 'crosstheroad.html';
+    }
+}
+function logout() {
+  sessionStorage.removeItem("loggedIn"); // Clear login status
+  window.location.href = "login.html"; // Redirect to login page
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('signupForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+
+        try {
+            const response = await fetch('http://localhost:4000/signup', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+
+            if (response.ok) {
+                alert("Account created successfully! Redirecting to login.");
+                window.location.href = "login.html";
+            } else {
+                const errorText = await response.text();
+                alert("Error: " + errorText);
+            }
+        } catch (err) {
+            alert("An error occurred. Please try again later.");
+            console.error(err);
+        }
+    });
+});
+
+// Sample credentials (for demonstration purposes only)
+var validUsername = "game";
+const validPassword = "abcd";
+
+// Get form and error message
+let form = document.getElementById("login-form");
+let errorMessage = document.getElementById("error-message");
+
+// Handle login form submission
+form.addEventListener("submit", function (e) {
+  e.preventDefault(); // Prevent page reload
+
+  const username = document.getElementById("username").value;
+  const password = document.getElementById("password").value;
+
+  // Check credentials
+  if (username === validUsername && password === validPassword) {
+    // Successful login: Redirect to the home page
+    sessionStorage.setItem("loggedIn", "true");
+    alert("Login successful! Redirecting to games...");
+    window.location.href = "index.html"; // Redirect to main page
+  } else {
+    // Failed login
+    errorMessage.textContent = "Invalid username or password.";
+  }
+});
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const username = document.getElementById('username').value;
+  const password = document.getElementById('password').value;
+
+  try {
+    const response = await fetch('/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+    });
+
+    if (response.ok) {
+      alert("Login successful! Redirecting...");
+      sessionStorage.setItem("loggedIn", "true");
+      window.location.href = "index.html"; 
+    } else {
+      const errorText = await response.text();
+      alert("Error: " + errorText);
+    }
+  } catch (err) {
+      alert("An error occurred. Please try again later.");
+      console.error(err);
+  }
+});
+
+const express = require("express");
+const mongoose = require("mongoose");
+const bodyParser = require("body-parser");
+const bcrypt = require("bcrypt");
+
+const app = express();
+const PORT = 3000;
+
+// Middleware
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
+
+// MongoDB Connection
+mongoose.connect("mongodb://localhost:27017/userAuthDB", { useNewUrlParser: true, useUnifiedTopology: true })
+  .then(() => console.log("Connected to MongoDB"))
+  .catch(err => console.log("MongoDB connection error:", err));
+
+// User Schema and Model
+const userSchema = new mongoose.Schema({
+  username: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
+});
+
+const User = mongoose.model("User", userSchema);
+
+// Routes
+// Signup
+app.post("/signup", async (req, res) => {
+  const { username, password } = req.body;
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const newUser = new User({ username, password: hashedPassword });
+    await newUser.save();
+    res.status(201).send("User registered successfully!");
+  } catch (err) {
+    res.status(500).send("Error registering user: " + err.message);
+  }
+});
+
+// Login
+app.post("/login", async (req, res) => {
+  const { username, password } = req.body;
+  try {
+    const user = await User.findOne({ username });
+    if (!user) return res.status(400).send("Invalid username or password!");
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return res.status(400).send("Invalid username or password!");
+
+    res.status(200).send("Login successful!");
+  } catch (err) {
+    res.status(401).send("Error logging in: " + err.message);
+  }
+});
+
+// Start Server
+app.listen(PORT, () => {
+  console.log(`Server is running on http://localhost:${PORT}`);
+});
+
+const mongoose = require('mongoose');
+// Define User schema
+const userSchema = new mongoose.Schema({
+    username: { type: String, unique: true, required: true },
+    password: { type: String, required: true }
+});
+
+// Create User model
+const User = mongoose.model('User', userSchema);
+
+// Export the User model
+module.exports = User;
+
+const TicTac = {
+    cPlayer: "X", 
+    state: Array(9).fill(null), 
+    gameOver: false, 
+
+    
+    init() {
+        this.cBoard();
+        document
+            .getElementById("reset")
+            .addEventListener("click", () => this.reset());
+    },
+
+   
+    cBoard() {
+        const board = document.getElementById("board");
+        board.innerHTML = ""; 
+        this.state.forEach((_, i) => {
+            const cell = document.createElement("div");
+            cell.classList.add("cell");
+            cell.dataset.index = i;
+            board.appendChild(cell);
+        });
+        board.addEventListener("click", (e) => this.handleClick(e)); 
+        this.uMessage(`Player ${this.cPlayer}'s turn`);
+    },
+
+    
+    handleClick(e) {
+        const cell = e.target;
+        const i = cell.dataset.index;
+
+        
+        if (this.gameOver || !cell.classList.contains("cell") || this.state[i])
+            return;
+
+      
+        this.state[i] = this.cPlayer;
+        cell.textContent = this.cPlayer;
+        cell.classList.add("taken");
+
+        
+        const winCombo = this.checkWin();
+        if (winCombo) {
+            this.highlight(winCombo);
+            this.uMessage(`Player ${this.cPlayer} wins!`);
+            this.gameOver = true;
+        } else if (this.state.every((cell) => cell)) {
+            this.uMessage("It's a tie!");
+            this.gameOver = true;
+        } else {
+          
+            this.cPlayer = this.cPlayer === "X" ? "O" : "X";
+            this.uMessage(`Player ${this.cPlayer}'s turn`);
+        }
+    },
+
+   
+    checkWin() {
+        const wins = [
+            [0, 1, 2],
+            [3, 4, 5],
+            [6, 7, 8], 
+            [0, 3, 6],
+            [1, 4, 7],
+            [2, 5, 8], 
+            [0, 4, 8],
+            [2, 4, 6],
+        ];
+        return wins.find((combo) =>
+            combo.every((i) => this.state[i] === this.cPlayer)
+        );
+    },
+
+    
+    highlight(combo) {
+        combo.forEach((i) => {
+            document.getElementById("board").children[i].style.color = "red";
+        });
+    },
+
+   
+    reset() {
+        this.state = Array(9).fill(null);
+        this.cPlayer = "X";
+        this.gameOver = false;
+        this.cBoard();
+    },
+
+    
+    uMessage(msg) {
+        document.getElementById("message").textContent = msg;
+    },
+};
+
+
+TicTac.init();
+
+const playBoard = document.querySelector(".play-board");
+const scoreElement = document.querySelector(".score");
+const highScoreElement = document.querySelector(".high-score");
+const controls = document.querySelectorAll(".controls i");
+let gameOver = false;
+let foodX, foodY;
+let snakeX = 5, snakeY = 5;
+let velocityX = 0, velocityY = 0;
+let snakeBody = [];
+let setIntervalId;
+let score = 0;
+// Getting high score from the local storage
+let highScore = localStorage.getItem("high-score") || 0;
+highScoreElement.innerText = `High Score: ${highScore}`;
+const updateFoodPosition = () => {
+    // Passing a random 1 - 30 value as food position
+    foodX = Math.floor(Math.random() * 30) + 1;
+    foodY = Math.floor(Math.random() * 30) + 1;
+}
+const handleGameOver = () => {
+    // Clearing the timer and reloading the page on game over
+    clearInterval(setIntervalId);
+    alert("Game Over! Press OK to replay...");
+    location.reload();
+}
+const changeDirection = e => {
+    // Changing velocity value based on key press
+    if(e.key === "ArrowUp" && velocityY != 1) {
+        velocityX = 0;
+        velocityY = -1;
+    } else if(e.key === "ArrowDown" && velocityY != -1) {
+        velocityX = 0;
+        velocityY = 1;
+    } else if(e.key === "ArrowLeft" && velocityX != 1) {
+        velocityX = -1;
+        velocityY = 0;
+    } else if(e.key === "ArrowRight" && velocityX != -1) {
+        velocityX = 1;
+        velocityY = 0;
+    }
+}
+// Calling changeDirection on each key click and passing key dataset value as an object
+controls.forEach(button => { button.addEventListener("click", () => changeDirection({ key: button.dataset.key }))
+});
+const initGame = () => {
+    if(gameOver) return handleGameOver();
+    let html = `<div class="food" style="grid-area: ${foodY} / ${foodX}"></div>`;
+    // Checking if the snake hit the food
+    if(snakeX === foodX && snakeY === foodY) {
+        updateFoodPosition();
+        snakeBody.push([foodY, foodX]); // Pushing food position to snake body array
+        score++; // increment score by 1
+        highScore = score >= highScore ? score : highScore;
+        localStorage.setItem("high-score", highScore);
+        scoreElement.innerText = `Score: ${score}`;
+        highScoreElement.innerText = `High Score: ${highScore}`;
+    }
+    // Updating the snake's head position based on the current velocity
+    snakeX += velocityX;
+    snakeY += velocityY;
+    
+    // Shifting forward the values of the elements in the snake body by one
+    for (let i = snakeBody.length - 1; i > 0; i--) {
+        snakeBody[i] = snakeBody[i - 1];
+    }
+    snakeBody[0] = [snakeX, snakeY]; // Setting first element of snake body to current snake position
+    // Checking if the snake's head is out of wall, if so setting gameOver to true
+    if(snakeX <= 0 || snakeX > 30 || snakeY <= 0 || snakeY > 30) {
+        return gameOver = true;
+    }
+    for (let i = 0; i < snakeBody.length; i++) {
+        // Adding a div for each part of the snake's body
+        html += `<div class="head" style="grid-area: ${snakeBody[i][1]} / ${snakeBody[i][0]}"></div>`;
+        // Checking if the snake head hit the body, if so set gameOver to true
+        if (i !== 0 && snakeBody[0][1] === snakeBody[i][1] && snakeBody[0][0] === snakeBody[i][0]) {
+            gameOver = true;
+        }
+    }
+    playBoard.innerHTML = html;
+}
+updateFoodPosition();
+setIntervalId = setInterval(initGame, 100);
+document.addEventListener("keyup", changeDirection);
+
+const cursor = document.querySelector('.cursor')
+const holes = [...document.querySelectorAll('.hole')]
+const scoreEl = document.querySelector('.score span')
+let score = 0
+
+const sound = new Audio("assets_smash.mp3")
+
+function run(){
+    const i = Math.floor(Math.random() * holes.length)
+    const hole = holes[i]
+    let timer = null
+
+    const img = document.createElement('img')
+    img.classList.add('mole')
+    img.src = 'mole.png'
+
+    img.addEventListener('click', () => {
+        score += 10
+        sound.play()
+        scoreEl.textContent = score
+        img.src = 'mole-whacked.png'
+        clearTimeout(timer)
+        setTimeout(() => {
+            hole.removeChild(img)
+            run()
+        }, 500)
+    })
+
+    hole.appendChild(img)
+
+    timer = setTimeout(() => {
+        hole.removeChild(img)
+        run()
+    }, 1500)
+}
+run()
+
+window.addEventListener('mousemove', e => {
+    cursor.style.top = e.pageY + 'px'
+    cursor.style.left = e.pageX + 'px'
+})
+window.addEventListener('mousedown', () => {
+    cursor.classList.add('active')
+})
+window.addEventListener('mouseup', () => {
+    cursor.classList.remove('active')
+})
+
+Math.minmax = (value, limit) => {
+    return Math.max(Math.min(value, limit), -limit);
+};
+
+const distance2D = (p1, p2) => {
+    return Math.sqrt((p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2);
+};
+
+// Angle between the two points
+const getAngle = (p1, p2) => {
+    let angle = Math.atan((p2.y - p1.y) / (p2.x - p1.x));
+    if (p2.x - p1.x < 0) angle += Math.PI;
+    return angle;
+};
+
+// The closest a ball and a wall cap can be
+const closestItCanBe = (cap, ball) => {
+    let angle = getAngle(cap, ball);
+
+    const deltaX = Math.cos(angle) * (wallW / 2 + ballSize / 2);
+    const deltaY = Math.sin(angle) * (wallW / 2 + ballSize / 2);
+
+    return { x: cap.x + deltaX, y: cap.y + deltaY };
+};
+
+// Roll the ball around the wall cap
+const rollAroundCap = (cap, ball) => {
+    // The direction the ball can't move any further because the wall holds it back
+    let impactAngle = getAngle(ball, cap);
+
+    // The direction the ball wants to move based on it's velocity
+    let heading = getAngle(
+        { x: 0, y: 0 },
+        { x: ball.velocityX, y: ball.velocityY }
+    );
+
+    let impactHeadingAngle = impactAngle - heading;
+
+    // Velocity distance if not hit would have occurred
+    const velocityMagnitude = distance2D(
+        { x: 0, y: 0 },
+        { x: ball.velocityX, y: ball.velocityY }
+    );
+    // Velocity component diagonal to the impact
+    const velocityMagnitudeDiagonalToTheImpact =
+        Math.sin(impactHeadingAngle) * velocityMagnitude;
+
+    // How far should the ball be from the wall cap
+    const closestDistance = wallW / 2 + ballSize / 2;
+
+    const rotationAngle = Math.atan(
+        velocityMagnitudeDiagonalToTheImpact / closestDistance
+    );
+
+    const deltaFromCap = {
+        x: Math.cos(impactAngle + Math.PI - rotationAngle) * closestDistance,
+        y: Math.sin(impactAngle + Math.PI - rotationAngle) * closestDistance
+    };
+
+    const x = ball.x;
+    const y = ball.y;
+    const velocityX = ball.x - (cap.x + deltaFromCap.x);
+    const velocityY = ball.y - (cap.y + deltaFromCap.y);
+    const nextX = x + velocityX;
+    const nextY = y + velocityY;
+
+    return { x, y, velocityX, velocityY, nextX, nextY };
+};
+
+// Decreases the absolute value of a number but keeps it's sign, doesn't go below abs 0
+const slow = (number, difference) => {
+    if (Math.abs(number) <= difference) return 0;
+    if (number > difference) return number - difference;
+    return number + difference;
+};
+
+const mazeElement = document.getElementById("maze");
+const joystickHeadElement = document.getElementById("joystick-head");
+const noteElement = document.getElementById("note"); // Note element for instructions and game won, game failed texts
+
+let hardMode = false;
+let previousTimestamp;
+let gameInProgress;
+let mouseStartX;
+let mouseStartY;
+let accelerationX;
+let accelerationY;
+let frictionX;
+let frictionY;
+
+const pathW = 25; // Path width
+const wallW = 10; // Wall width
+const ballSize = 10; // Width and height of the ball
+const holeSize = 18;
+
+const debugMode = false;
+
+let balls = [];
+let ballElements = [];
+let holeElements = [];
+
+resetGame();
+
+// Draw balls for the first time
+balls.forEach(({ x, y }) => {
+    const ball = document.createElement("div");
+    ball.setAttribute("class", "ball");
+    ball.style.cssText = `left: ${x}px; top: ${y}px; `;
+
+    mazeElement.appendChild(ball);
+    ballElements.push(ball);
+});
+
+// Wall metadata
+const walls = [
+    // Border
+    { column: 0, row: 0, horizontal: true, length: 10 },
+    { column: 0, row: 0, horizontal: false, length: 9 },
+    { column: 0, row: 9, horizontal: true, length: 10 },
+    { column: 10, row: 0, horizontal: false, length: 9 },
+
+    // Horizontal lines starting in 1st column
+    { column: 0, row: 6, horizontal: true, length: 1 },
+    { column: 0, row: 8, horizontal: true, length: 1 },
+
+    // Horizontal lines starting in 2nd column
+    { column: 1, row: 1, horizontal: true, length: 2 },
+    { column: 1, row: 7, horizontal: true, length: 1 },
+
+    // Horizontal lines starting in 3rd column
+    { column: 2, row: 2, horizontal: true, length: 2 },
+    { column: 2, row: 4, horizontal: true, length: 1 },
+    { column: 2, row: 5, horizontal: true, length: 1 },
+    { column: 2, row: 6, horizontal: true, length: 1 },
+
+    // Horizontal lines starting in 4th column
+    { column: 3, row: 3, horizontal: true, length: 1 },
+    { column: 3, row: 8, horizontal: true, length: 3 },
+
+    // Horizontal lines starting in 5th column
+    { column: 4, row: 6, horizontal: true, length: 1 },
+
+    // Horizontal lines starting in 6th column
+    { column: 5, row: 2, horizontal: true, length: 2 },
+    { column: 5, row: 7, horizontal: true, length: 1 },
+
+    // Horizontal lines starting in 7th column
+    { column: 6, row: 1, horizontal: true, length: 1 },
+    { column: 6, row: 6, horizontal: true, length: 2 },
+
+    // Horizontal lines starting in 8th column
+    { column: 7, row: 3, horizontal: true, length: 2 },
+    { column: 7, row: 7, horizontal: true, length: 2 },
+
+    // Horizontal lines starting in 9th column
+    { column: 8, row: 1, horizontal: true, length: 1 },
+    { column: 8, row: 2, horizontal: true, length: 1 },
+    { column: 8, row: 3, horizontal: true, length: 1 },
+    { column: 8, row: 4, horizontal: true, length: 2 },
+    { column: 8, row: 8, horizontal: true, length: 2 },
+
+    // Vertical lines after the 1st column
+    { column: 1, row: 1, horizontal: false, length: 2 },
+    { column: 1, row: 4, horizontal: false, length: 2 },
+
+    // Vertical lines after the 2nd column
+    { column: 2, row: 2, horizontal: false, length: 2 },
+    { column: 2, row: 5, horizontal: false, length: 1 },
+    { column: 2, row: 7, horizontal: false, length: 2 },
+
+    // Vertical lines after the 3rd column
+    { column: 3, row: 0, horizontal: false, length: 1 },
+    { column: 3, row: 4, horizontal: false, length: 1 },
+    { column: 3, row: 6, horizontal: false, length: 2 },
+
+    // Vertical lines after the 4th column
+    { column: 4, row: 1, horizontal: false, length: 2 },
+    { column: 4, row: 6, horizontal: false, length: 1 },
+
+    // Vertical lines after the 5th column
+    { column: 5, row: 0, horizontal: false, length: 2 },
+    { column: 5, row: 6, horizontal: false, length: 1 },
+    { column: 5, row: 8, horizontal: false, length: 1 },
+
+    // Vertical lines after the 6th column
+    { column: 6, row: 4, horizontal: false, length: 1 },
+    { column: 6, row: 6, horizontal: false, length: 1 },
+
+    // Vertical lines after the 7th column
+    { column: 7, row: 1, horizontal: false, length: 4 },
+    { column: 7, row: 7, horizontal: false, length: 2 },
+
+    // Vertical lines after the 8th column
+    { column: 8, row: 2, horizontal: false, length: 1 },
+    { column: 8, row: 4, horizontal: false, length: 2 },
+
+    // Vertical lines after the 9th column
+    { column: 9, row: 1, horizontal: false, length: 1 },
+    { column: 9, row: 5, horizontal: false, length: 2 }
+].map((wall) => ({
+    x: wall.column * (pathW + wallW),
+    y: wall.row * (pathW + wallW),
+    horizontal: wall.horizontal,
+    length: wall.length * (pathW + wallW)
+}));
+
+// Draw walls
+walls.forEach(({ x, y, horizontal, length }) => {
+    const wall = document.createElement("div");
+    wall.setAttribute("class", "wall");
+    wall.style.cssText = `
+        left: ${x}px;
+        top: ${y}px;
+        width: ${wallW}px;
+        height: ${length}px;
+        transform: rotate(${horizontal ? -90 : 0}deg);
+      `;
+
+    mazeElement.appendChild(wall);
+});
+
+const holes = [
+    { column: 0, row: 5 },
+    { column: 2, row: 0 },
+    { column: 2, row: 4 },
+    { column: 4, row: 6 },
+    { column: 6, row: 2 },
+    { column: 6, row: 8 },
+    { column: 8, row: 1 },
+    { column: 8, row: 2 }
+].map((hole) => ({
+    x: hole.column * (wallW + pathW) + (wallW / 2 + pathW / 2),
+    y: hole.row * (wallW + pathW) + (wallW / 2 + pathW / 2)
+}));
+
+joystickHeadElement.addEventListener("mousedown", function (event) {
+    if (!gameInProgress) {
+        mouseStartX = event.clientX;
+        mouseStartY = event.clientY;
+        gameInProgress = true;
+        window.requestAnimationFrame(main);
+        noteElement.style.opacity = 0;
+        joystickHeadElement.style.cssText = `
+          animation: none;
+          cursor: grabbing;
+        `;
+    }
+});
+
+window.addEventListener("mousemove", function (event) {
+    if (gameInProgress) {
+        const mouseDeltaX = -Math.minmax(mouseStartX - event.clientX, 15);
+        const mouseDeltaY = -Math.minmax(mouseStartY - event.clientY, 15);
+
+        joystickHeadElement.style.cssText = `
+          left: ${mouseDeltaX}px;
+          top: ${mouseDeltaY}px;
+          animation: none;
+          cursor: grabbing;
+        `;
+
+        const rotationY = mouseDeltaX * 0.8; // Max rotation = 12
+        const rotationX = mouseDeltaY * 0.8;
+
+        mazeElement.style.cssText = `
+          transform: rotateY(${rotationY}deg) rotateX(${-rotationX}deg)
+        `;
+
+        const gravity = 2;
+        const friction = 0.01; // Coefficients of friction
+
+        accelerationX = gravity * Math.sin((rotationY / 180) * Math.PI);
+        accelerationY = gravity * Math.sin((rotationX / 180) * Math.PI);
+        frictionX = gravity * Math.cos((rotationY / 180) * Math.PI) * friction;
+        frictionY = gravity * Math.cos((rotationX / 180) * Math.PI) * friction;
+    }
+});
+
+window.addEventListener("keydown", function (event) {
+    // If not an arrow key or space or H was pressed then return
+    if (![" ", "H", "h", "E", "e"].includes(event.key)) return;
+
+    // If an arrow key was pressed then first prevent default
+    event.preventDefault();
+
+    // If space was pressed restart the game
+    if (event.key == " ") {
+        resetGame();
+        return;
+    }
+
+    // Set Hard mode
+    if (event.key == "H" || event.key == "h") {
+        hardMode = true;
+        resetGame();
+        return;
+    }
+
+    // Set Easy mode
+    if (event.key == "E" || event.key == "e") {
+        hardMode = false;
+        resetGame();
+        return;
+    }
+});
+
+function resetGame() {
+    previousTimestamp = undefined;
+    gameInProgress = false;
+    mouseStartX = undefined;
+    mouseStartY = undefined;
+    accelerationX = undefined;
+    accelerationY = undefined;
+    frictionX = undefined;
+    frictionY = undefined;
+
+    mazeElement.style.cssText = `
+        transform: rotateY(0deg) rotateX(0deg)
+      `;
+
+    joystickHeadElement.style.cssText = `
+        left: 0;
+        top: 0;
+        animation: glow;
+        cursor: grab;
+      `;
+
+    if (hardMode) {
+        noteElement.innerHTML = `Click the joystick to start!
+          <p>Hard mode, Avoid black holes. Back to easy mode? Press E</p>`;
+    } else {
+        noteElement.innerHTML = `Click the joystick to start!
+          <p>Move every ball to the center. Ready for hard mode? Press H</p>`;
+    }
+    noteElement.style.opacity = 1;
+
+    balls = [
+        { column: 0, row: 0 },
+        { column: 9, row: 0 },
+        { column: 0, row: 8 },
+        { column: 9, row: 8 }
+    ].map((ball) => ({
+        x: ball.column * (wallW + pathW) + (wallW / 2 + pathW / 2),
+        y: ball.row * (wallW + pathW) + (wallW / 2 + pathW / 2),
+        velocityX: 0,
+        velocityY: 0
+    }));
+
+    if (ballElements.length) {
+        balls.forEach(({ x, y }, index) => {
+            ballElements[index].style.cssText = `left: ${x}px; top: ${y}px; `;
+        });
+    }
+
+    // Remove previous hole elements
+    holeElements.forEach((holeElement) => {
+        mazeElement.removeChild(holeElement);
+    });
+    holeElements = [];
+
+    // Reset hole elements if hard mode
+    if (hardMode) {
+        holes.forEach(({ x, y }) => {
+            const ball = document.createElement("div");
+            ball.setAttribute("class", "black-hole");
+            ball.style.cssText = `left: ${x}px; top: ${y}px; `;
+
+            mazeElement.appendChild(ball);
+            holeElements.push(ball);
+        });
+    }
+}
+
+function main(timestamp) {
+    // It is possible to reset the game mid-game. This case the look should stop
+    if (!gameInProgress) return;
+
+    if (previousTimestamp === undefined) {
+        previousTimestamp = timestamp;
+        window.requestAnimationFrame(main);
+        return;
+    }
+
+    const maxVelocity = 1.5;
+
+    const timeElapsed = (timestamp - previousTimestamp) / 16;
+
+    try {
+        // If mouse didn't move yet don't do anything
+        if (accelerationX != undefined && accelerationY != undefined) {
+            const velocityChangeX = accelerationX * timeElapsed;
+            const velocityChangeY = accelerationY * timeElapsed;
+            const frictionDeltaX = frictionX * timeElapsed;
+            const frictionDeltaY = frictionY * timeElapsed;
+
+            balls.forEach((ball) => {
+                if (velocityChangeX == 0) {
+
+                    ball.velocityX = slow(ball.velocityX, frictionDeltaX);
+                } else {
+                    ball.velocityX = ball.velocityX + velocityChangeX;
+                    ball.velocityX = Math.max(Math.min(ball.velocityX, 1.5), -1.5);
+                    ball.velocityX =
+                        ball.velocityX - Math.sign(velocityChangeX) * frictionDeltaX;
+                    ball.velocityX = Math.minmax(ball.velocityX, maxVelocity);
+                }
+
+                if (velocityChangeY == 0) {
+
+                    ball.velocityY = slow(ball.velocityY, frictionDeltaY);
+                } else {
+                    ball.velocityY = ball.velocityY + velocityChangeY;
+                    ball.velocityY =
+                        ball.velocityY - Math.sign(velocityChangeY) * frictionDeltaY;
+                    ball.velocityY = Math.minmax(ball.velocityY, maxVelocity);
+                }
+
+                ball.nextX = ball.x + ball.velocityX;
+                ball.nextY = ball.y + ball.velocityY;
+
+                if (debugMode) console.log("tick", ball);
+
+                walls.forEach((wall, wi) => {
+                    if (wall.horizontal) {
+                        // Horizontal wall
+
+                        if (
+                            ball.nextY + ballSize / 2 >= wall.y - wallW / 2 &&
+                            ball.nextY - ballSize / 2 <= wall.y + wallW / 2
+                        ) {
+
+
+                            const wallStart = {
+                                x: wall.x,
+                                y: wall.y
+                            };
+                            const wallEnd = {
+                                x: wall.x + wall.length,
+                                y: wall.y
+                            };
+
+                            if (
+                                ball.nextX + ballSize / 2 >= wallStart.x - wallW / 2 &&
+                                ball.nextX < wallStart.x
+                            ) {
+                                // Ball might hit the left cap of a horizontal wall
+                                const distance = distance2D(wallStart, {
+                                    x: ball.nextX,
+                                    y: ball.nextY
+                                });
+                                if (distance < ballSize / 2 + wallW / 2) {
+                                    if (debugMode && wi > 4)
+                                        console.warn("too close h head", distance, ball);
+
+                                    // Ball hits the left cap of a horizontal wall
+                                    const closest = closestItCanBe(wallStart, {
+                                        x: ball.nextX,
+                                        y: ball.nextY
+                                    });
+                                    const rolled = rollAroundCap(wallStart, {
+                                        x: closest.x,
+                                        y: closest.y,
+                                        velocityX: ball.velocityX,
+                                        velocityY: ball.velocityY
+                                    });
+
+                                    Object.assign(ball, rolled);
+                                }
+                            }
+
+                            if (
+                                ball.nextX - ballSize / 2 <= wallEnd.x + wallW / 2 &&
+                                ball.nextX > wallEnd.x
+                            ) {
+                                // Ball might hit the right cap of a horizontal wall
+                                const distance = distance2D(wallEnd, {
+                                    x: ball.nextX,
+                                    y: ball.nextY
+                                });
+                                if (distance < ballSize / 2 + wallW / 2) {
+                                    if (debugMode && wi > 4)
+                                        console.warn("too close h tail", distance, ball);
+
+                                    // Ball hits the right cap of a horizontal wall
+                                    const closest = closestItCanBe(wallEnd, {
+                                        x: ball.nextX,
+                                        y: ball.nextY
+                                    });
+                                    const rolled = rollAroundCap(wallEnd, {
+                                        x: closest.x,
+                                        y: closest.y,
+                                        velocityX: ball.velocityX,
+                                        velocityY: ball.velocityY
+                                    });
+
+                                    Object.assign(ball, rolled);
+                                }
+                            }
+
+                            if (ball.nextX >= wallStart.x && ball.nextX <= wallEnd.x) {
+                                // The ball got inside the main body of the wall
+                                if (ball.nextY < wall.y) {
+                                    // Hit horizontal wall from top
+                                    ball.nextY = wall.y - wallW / 2 - ballSize / 2;
+                                } else {
+                                    // Hit horizontal wall from bottom
+                                    ball.nextY = wall.y + wallW / 2 + ballSize / 2;
+                                }
+                                ball.y = ball.nextY;
+                                ball.velocityY = -ball.velocityY / 3;
+
+                                if (debugMode && wi > 4)
+                                    console.error("crossing h line, HIT", ball);
+                            }
+                        }
+                    } else {
+                        // Vertical wall
+
+                        if (
+                            ball.nextX + ballSize / 2 >= wall.x - wallW / 2 &&
+                            ball.nextX - ballSize / 2 <= wall.x + wallW / 2
+                        ) {
+                            const wallStart = {
+                                x: wall.x,
+                                y: wall.y
+                            };
+                            const wallEnd = {
+                                x: wall.x,
+                                y: wall.y + wall.length
+                            };
+
+                            if (
+                                ball.nextY + ballSize / 2 >= wallStart.y - wallW / 2 &&
+                                ball.nextY < wallStart.y
+                            ) {
+                                // Ball might hit the top cap of a horizontal wall
+                                const distance = distance2D(wallStart, {
+                                    x: ball.nextX,
+                                    y: ball.nextY
+                                });
+                                if (distance < ballSize / 2 + wallW / 2) {
+                                    if (debugMode && wi > 4)
+                                        console.warn("too close v head", distance, ball);
+
+                                    // Ball hits the left cap of a horizontal wall
+                                    const closest = closestItCanBe(wallStart, {
+                                        x: ball.nextX,
+                                        y: ball.nextY
+                                    });
+                                    const rolled = rollAroundCap(wallStart, {
+                                        x: closest.x,
+                                        y: closest.y,
+                                        velocityX: ball.velocityX,
+                                        velocityY: ball.velocityY
+                                    });
+
+                                    Object.assign(ball, rolled);
+                                }
+                            }
+
+                            if (
+                                ball.nextY - ballSize / 2 <= wallEnd.y + wallW / 2 &&
+                                ball.nextY > wallEnd.y
+                            ) {
+                                // Ball might hit the bottom cap of a horizontal wall
+                                const distance = distance2D(wallEnd, {
+                                    x: ball.nextX,
+                                    y: ball.nextY
+                                });
+                                if (distance < ballSize / 2 + wallW / 2) {
+                                    if (debugMode && wi > 4)
+                                        console.warn("too close v tail", distance, ball);
+
+                                    // Ball hits the right cap of a horizontal wall
+                                    const closest = closestItCanBe(wallEnd, {
+                                        x: ball.nextX,
+                                        y: ball.nextY
+                                    });
+                                    const rolled = rollAroundCap(wallEnd, {
+                                        x: closest.x,
+                                        y: closest.y,
+                                        velocityX: ball.velocityX,
+                                        velocityY: ball.velocityY
+                                    });
+
+                                    Object.assign(ball, rolled);
+                                }
+                            }
+
+                            if (ball.nextY >= wallStart.y && ball.nextY <= wallEnd.y) {
+                                // The ball got inside the main body of the wall
+                                if (ball.nextX < wall.x) {
+                                    // Hit vertical wall from left
+                                    ball.nextX = wall.x - wallW / 2 - ballSize / 2;
+                                } else {
+                                    // Hit vertical wall from right
+                                    ball.nextX = wall.x + wallW / 2 + ballSize / 2;
+                                }
+                                ball.x = ball.nextX;
+                                ball.velocityX = -ball.velocityX / 3;
+
+                                if (debugMode && wi > 4)
+                                    console.error("crossing v line, HIT", ball);
+                            }
+                        }
+                    }
+                });
+
+                // Detect is a ball fell into a hole
+                if (hardMode) {
+                    holes.forEach((hole, hi) => {
+                        const distance = distance2D(hole, {
+                            x: ball.nextX,
+                            y: ball.nextY
+                        });
+
+                        if (distance <= holeSize / 2) {
+                            // The ball fell into a hole
+                            holeElements[hi].style.backgroundColor = "red";
+                            throw Error("The ball fell into a hole");
+                        }
+                    });
+                }
+
+                // Adjust ball metadata
+                ball.x = ball.x + ball.velocityX;
+                ball.y = ball.y + ball.velocityY;
+            });
+
+            // Move balls to their new position on the UI
+            balls.forEach(({ x, y }, index) => {
+                ballElements[index].style.cssText = `left: ${x}px; top: ${y}px; `;
+            });
+        }
+
+        // Win detection
+        if (
+            balls.every(
+                (ball) => distance2D(ball, { x: 350 / 2, y: 315 / 2 }) < 65 / 2
+            )
+        ) {
+            noteElement.innerHTML = `Congrats, you did it!
+          ${!hardMode ? "<p>Press H for hard mode</p>" : ""}
+          <p>
+            Follow me
+            
+            >
+          </p>`;
+            noteElement.style.opacity = 1;
+            gameInProgress = false;
+        } else {
+            previousTimestamp = timestamp;
+            window.requestAnimationFrame(main);
+        }
+    } catch (error) {
+        if (error.message == "The ball fell into a hole") {
+            noteElement.innerHTML = `A ball fell into a black hole! Press space to reset the game.
+          <p>
+            Back to easy? Press E
+          </p>`;
+            noteElement.style.opacity = 1;
+            gameInProgress = false;
+        } else throw error;
+    }
+}
+
+const counterDOM = document.getElementById('counter');
+const endDOM = document.getElementById('end');
+
+const scene = new THREE.Scene();
+
+const distance = 500;
+const camera = new THREE.OrthographicCamera( window.innerWidth/-2, window.innerWidth/2, window.innerHeight / 2, window.innerHeight / -2, 0.1, 10000 );
+
+camera.rotation.x = 50*Math.PI/180;
+camera.rotation.y = 20*Math.PI/180;
+camera.rotation.z = 10*Math.PI/180;
+
+const initialCameraPositionY = -Math.tan(camera.rotation.x)*distance;
+const initialCameraPositionX = Math.tan(camera.rotation.y)*Math.sqrt(distance**2 + initialCameraPositionY**2);
+camera.position.y = initialCameraPositionY;
+camera.position.x = initialCameraPositionX;
+camera.position.z = distance;
+
+const zoom = 2;
+
+const chickenSize = 15;
+
+const positionWidth = 42;
+const columns = 17;
+const boardWidth = positionWidth*columns;
+
+const stepTime = 200; // Miliseconds it takes for the chicken to take a step forward, backward, left or right
+
+let lanes;
+let currentLane;
+let currentColumn;
+
+let previousTimestamp;
+let startMoving;
+let moves;
+let stepStartTimestamp;
+
+const carFrontTexture = new Texture(40,80,[{x: 0, y: 10, w: 30, h: 60 }]);
+const carBackTexture = new Texture(40,80,[{x: 10, y: 10, w: 30, h: 60 }]);
+const carRightSideTexture = new Texture(110,40,[{x: 10, y: 0, w: 50, h: 30 }, {x: 70, y: 0, w: 30, h: 30 }]);
+const carLeftSideTexture = new Texture(110,40,[{x: 10, y: 10, w: 50, h: 30 }, {x: 70, y: 10, w: 30, h: 30 }]);
+
+const truckFrontTexture = new Texture(30,30,[{x: 15, y: 0, w: 10, h: 30 }]);
+const truckRightSideTexture = new Texture(25,30,[{x: 0, y: 15, w: 10, h: 10 }]);
+const truckLeftSideTexture = new Texture(25,30,[{x: 0, y: 5, w: 10, h: 10 }]);
+
+const generateLanes = () => [-9,-8,-7,-6,-5,-4,-3,-2,-1,0,1,2,3,4,5,6,7,8,9].map((index) => {
+  const lane = new Lane(index);
+  lane.mesh.position.y = index*positionWidth*zoom;
+  scene.add( lane.mesh );
+  return lane;
+}).filter((lane) => lane.index >= 0);
+
+const addLane = () => {
+  const index = lanes.length;
+  const lane = new Lane(index);
+  lane.mesh.position.y = index*positionWidth*zoom;
+  scene.add(lane.mesh);
+  lanes.push(lane);
+}
+
+const chicken = new Chicken();
+scene.add( chicken );
+
+hemiLight = new THREE.HemisphereLight(0xffffff, 0xffffff, 0.6);
+scene.add(hemiLight)
+
+const initialDirLightPositionX = -100;
+const initialDirLightPositionY = -100;
+dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
+dirLight.position.set(initialDirLightPositionX, initialDirLightPositionY, 200);
+dirLight.castShadow = true;
+dirLight.target = chicken;
+scene.add(dirLight);
+
+dirLight.shadow.mapSize.width = 2048;
+dirLight.shadow.mapSize.height = 2048;
+var d = 500;
+dirLight.shadow.camera.left = - d;
+dirLight.shadow.camera.right = d;
+dirLight.shadow.camera.top = d;
+dirLight.shadow.camera.bottom = - d;
+
+// var helper = new THREE.CameraHelper( dirLight.shadow.camera );
+// var helper = new THREE.CameraHelper( camera );
+// scene.add(helper)
+
+backLight = new THREE.DirectionalLight(0x000000, .4);
+backLight.position.set(200, 200, 50);
+backLight.castShadow = true;
+scene.add(backLight)
+
+const laneTypes = ['car', 'truck', 'forest'];
+const laneSpeeds = [2, 2.5, 3];
+const vechicleColors = [0xa52523, 0xbdb638, 0x78b14b];
+const threeHeights = [20,45,60];
+
+const initaliseValues = () => {
+  lanes = generateLanes()
+
+  currentLane = 0;
+  currentColumn = Math.floor(columns/2);
+
+  previousTimestamp = null;
+
+  startMoving = false;
+  moves = [];
+  stepStartTimestamp;
+
+  chicken.position.x = 0;
+  chicken.position.y = 0;
+
+  camera.position.y = initialCameraPositionY;
+  camera.position.x = initialCameraPositionX;
+
+  dirLight.position.x = initialDirLightPositionX;
+  dirLight.position.y = initialDirLightPositionY;
+}
+
+initaliseValues();
+
+const renderer = new THREE.WebGLRenderer({
+  alpha: true,
+  antialias: true
+});
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.setSize( window.innerWidth, window.innerHeight );
+document.body.appendChild( renderer.domElement );
+
+function Texture(width, height, rects) {
+  const canvas = document.createElement( "canvas" );
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext( "2d" );
+  context.fillStyle = "#ffffff";
+  context.fillRect( 0, 0, width, height );
+  context.fillStyle = "rgba(0,0,0,0.6)";
+  rects.forEach(rect => {
+    context.fillRect(rect.x, rect.y, rect.w, rect.h);
+  });
+  return new THREE.CanvasTexture(canvas);
+}
+
+function Wheel() {
+  const wheel = new THREE.Mesh(
+    new THREE.BoxBufferGeometry( 12*zoom, 33*zoom, 12*zoom ),
+    new THREE.MeshLambertMaterial( { color: 0x333333, flatShading: true } )
+  );
+  wheel.position.z = 6*zoom;
+  return wheel;
+}
+
+function Car() {
+  const car = new THREE.Group();
+  const color = vechicleColors[Math.floor(Math.random() * vechicleColors.length)];
+
+  const main = new THREE.Mesh(
+    new THREE.BoxBufferGeometry( 60*zoom, 30*zoom, 15*zoom ),
+    new THREE.MeshPhongMaterial( { color, flatShading: true } )
+  );
+  main.position.z = 12*zoom;
+  main.castShadow = true;
+  main.receiveShadow = true;
+  car.add(main)
+
+  const cabin = new THREE.Mesh(
+    new THREE.BoxBufferGeometry( 33*zoom, 24*zoom, 12*zoom ),
+    [
+      new THREE.MeshPhongMaterial( { color: 0xcccccc, flatShading: true, map: carBackTexture } ),
+      new THREE.MeshPhongMaterial( { color: 0xcccccc, flatShading: true, map: carFrontTexture } ),
+      new THREE.MeshPhongMaterial( { color: 0xcccccc, flatShading: true, map: carRightSideTexture } ),
+      new THREE.MeshPhongMaterial( { color: 0xcccccc, flatShading: true, map: carLeftSideTexture } ),
+      new THREE.MeshPhongMaterial( { color: 0xcccccc, flatShading: true } ), // top
+      new THREE.MeshPhongMaterial( { color: 0xcccccc, flatShading: true } ) // bottom
+    ]
+  );
+  cabin.position.x = 6*zoom;
+  cabin.position.z = 25.5*zoom;
+  cabin.castShadow = true;
+  cabin.receiveShadow = true;
+  car.add( cabin );
+
+  const frontWheel = new Wheel();
+  frontWheel.position.x = -18*zoom;
+  car.add( frontWheel );
+
+  const backWheel = new Wheel();
+  backWheel.position.x = 18*zoom;
+  car.add( backWheel );
+
+  car.castShadow = true;
+  car.receiveShadow = false;
+
+  return car;
+}
+
+function Truck() {
+  const truck = new THREE.Group();
+  const color = vechicleColors[Math.floor(Math.random() * vechicleColors.length)];
+
+
+  const base = new THREE.Mesh(
+    new THREE.BoxBufferGeometry( 100*zoom, 25*zoom, 5*zoom ),
+    new THREE.MeshLambertMaterial( { color: 0xb4c6fc, flatShading: true } )
+  );
+  base.position.z = 10*zoom;
+  truck.add(base)
+
+  const cargo = new THREE.Mesh(
+    new THREE.BoxBufferGeometry( 75*zoom, 35*zoom, 40*zoom ),
+    new THREE.MeshPhongMaterial( { color: 0xb4c6fc, flatShading: true } )
+  );
+  cargo.position.x = 15*zoom;
+  cargo.position.z = 30*zoom;
+  cargo.castShadow = true;
+  cargo.receiveShadow = true;
+  truck.add(cargo)
+
+  const cabin = new THREE.Mesh(
+    new THREE.BoxBufferGeometry( 25*zoom, 30*zoom, 30*zoom ),
+    [
+      new THREE.MeshPhongMaterial( { color, flatShading: true } ), // back
+      new THREE.MeshPhongMaterial( { color, flatShading: true, map: truckFrontTexture } ),
+      new THREE.MeshPhongMaterial( { color, flatShading: true, map: truckRightSideTexture } ),
+      new THREE.MeshPhongMaterial( { color, flatShading: true, map: truckLeftSideTexture } ),
+      new THREE.MeshPhongMaterial( { color, flatShading: true } ), // top
+      new THREE.MeshPhongMaterial( { color, flatShading: true } ) // bottom
+    ]
+  );
+  cabin.position.x = -40*zoom;
+  cabin.position.z = 20*zoom;
+  cabin.castShadow = true;
+  cabin.receiveShadow = true;
+  truck.add( cabin );
+
+  const frontWheel = new Wheel();
+  frontWheel.position.x = -38*zoom;
+  truck.add( frontWheel );
+
+  const middleWheel = new Wheel();
+  middleWheel.position.x = -10*zoom;
+  truck.add( middleWheel );
+
+  const backWheel = new Wheel();
+  backWheel.position.x = 30*zoom;
+  truck.add( backWheel );
+
+  return truck;
+}
+
+function Three() {
+  const three = new THREE.Group();
+
+  const trunk = new THREE.Mesh(
+    new THREE.BoxBufferGeometry( 15*zoom, 15*zoom, 20*zoom ),
+    new THREE.MeshPhongMaterial( { color: 0x4d2926, flatShading: true } )
+  );
+  trunk.position.z = 10*zoom;
+  trunk.castShadow = true;
+  trunk.receiveShadow = true;
+  three.add(trunk);
+
+  height = threeHeights[Math.floor(Math.random()*threeHeights.length)];
+
+  const crown = new THREE.Mesh(
+    new THREE.BoxBufferGeometry( 30*zoom, 30*zoom, height*zoom ),
+    new THREE.MeshLambertMaterial( { color: 0x7aa21d, flatShading: true } )
+  );
+  crown.position.z = (height/2+20)*zoom;
+  crown.castShadow = true;
+  crown.receiveShadow = false;
+  three.add(crown);
+
+  return three;
+}
+
+function Chicken() {
+  const chicken = new THREE.Group();
+
+  const body = new THREE.Mesh(
+    new THREE.BoxBufferGeometry( chickenSize*zoom, chickenSize*zoom, 20*zoom ),
+    new THREE.MeshPhongMaterial( { color: 0xffffff, flatShading: true } )
+  );
+  body.position.z = 10*zoom;
+  body.castShadow = true;
+  body.receiveShadow = true;
+  chicken.add(body);
+
+  const rowel = new THREE.Mesh(
+    new THREE.BoxBufferGeometry( 2*zoom, 4*zoom, 2*zoom ),
+    new THREE.MeshLambertMaterial( { color: 0xF0619A, flatShading: true } )
+  );
+  rowel.position.z = 21*zoom;
+  rowel.castShadow = true;
+  rowel.receiveShadow = false;
+  chicken.add(rowel);
+
+  return chicken;
+}
+
+function Road() {
+  const road = new THREE.Group();
+
+  const createSection = color => new THREE.Mesh(
+    new THREE.PlaneBufferGeometry( boardWidth*zoom, positionWidth*zoom ),
+    new THREE.MeshPhongMaterial( { color } )
+  );
+
+  const middle = createSection(0x454A59);
+  middle.receiveShadow = true;
+  road.add(middle);
+
+  const left = createSection(0x393D49);
+  left.position.x = - boardWidth*zoom;
+  road.add(left);
+
+  const right = createSection(0x393D49);
+  right.position.x = boardWidth*zoom;
+  road.add(right);
+
+  return road;
+}
+
+function Grass() {
+  const grass = new THREE.Group();
+
+  const createSection = color => new THREE.Mesh(
+    new THREE.BoxBufferGeometry( boardWidth*zoom, positionWidth*zoom, 3*zoom ),
+    new THREE.MeshPhongMaterial( { color } )
+  );
+
+  const middle = createSection(0xbaf455);
+  middle.receiveShadow = true;
+  grass.add(middle);
+
+  const left = createSection(0x99C846);
+  left.position.x = - boardWidth*zoom;
+  grass.add(left);
+
+  const right = createSection(0x99C846);
+  right.position.x = boardWidth*zoom;
+  grass.add(right);
+
+  grass.position.z = 1.5*zoom;
+  return grass;
+}
+
+function Lane(index) {
+  this.index = index;
+  this.type = index <= 0 ? 'field' : laneTypes[Math.floor(Math.random()*laneTypes.length)];
+
+  switch(this.type) {
+    case 'field': {
+      this.type = 'field';
+      this.mesh = new Grass();
+      break;
+    }
+    case 'forest': {
+      this.mesh = new Grass();
+
+      this.occupiedPositions = new Set();
+      this.threes = [1,2,3,4].map(() => {
+        const three = new Three();
+        let position;
+        do {
+          position = Math.floor(Math.random()*columns);
+        }while(this.occupiedPositions.has(position))
+          this.occupiedPositions.add(position);
+        three.position.x = (position*positionWidth+positionWidth/2)*zoom-boardWidth*zoom/2;
+        this.mesh.add( three );
+        return three;
+      })
+      break;
+    }
+    case 'car' : {
+      this.mesh = new Road();
+      this.direction = Math.random() >= 0.5;
+
+      const occupiedPositions = new Set();
+      this.vechicles = [1,2,3].map(() => {
+        const vechicle = new Car();
+        let position;
+        do {
+          position = Math.floor(Math.random()*columns/2);
+        }while(occupiedPositions.has(position))
+          occupiedPositions.add(position);
+        vechicle.position.x = (position*positionWidth*2+positionWidth/2)*zoom-boardWidth*zoom/2;
+        if(!this.direction) vechicle.rotation.z = Math.PI;
+        this.mesh.add( vechicle );
+        return vechicle;
+      })
+
+      this.speed = laneSpeeds[Math.floor(Math.random()*laneSpeeds.length)];
+      break;
+    }
+    case 'truck' : {
+      this.mesh = new Road();
+      this.direction = Math.random() >= 0.5;
+
+      const occupiedPositions = new Set();
+      this.vechicles = [1,2].map(() => {
+        const vechicle = new Truck();
+        let position;
+        do {
+          position = Math.floor(Math.random()*columns/3);
+        }while(occupiedPositions.has(position))
+          occupiedPositions.add(position);
+        vechicle.position.x = (position*positionWidth*3+positionWidth/2)*zoom-boardWidth*zoom/2;
+        if(!this.direction) vechicle.rotation.z = Math.PI;
+        this.mesh.add( vechicle );
+        return vechicle;
+      })
+
+      this.speed = laneSpeeds[Math.floor(Math.random()*laneSpeeds.length)];
+      break;
+    }
+  }
+}
+
+document.querySelector("#retry").addEventListener("click", () => {
+  lanes.forEach(lane => scene.remove( lane.mesh ));
+  initaliseValues();
+  endDOM.style.visibility = 'hidden';
+});
+
+document.getElementById('forward').addEventListener("click", () => move('forward'));
+
+document.getElementById('backward').addEventListener("click", () => move('backward'));
+
+document.getElementById('left').addEventListener("click", () => move('left'));
+
+document.getElementById('right').addEventListener("click", () => move('right'));
+
+window.addEventListener("keydown", event => {
+  if (event.keyCode == '38') {
+    // up arrow
+    move('forward');
+  }
+  else if (event.keyCode == '40') {
+    // down arrow
+    move('backward');
+  }
+  else if (event.keyCode == '37') {
+    // left arrow
+    move('left');
+  }
+  else if (event.keyCode == '39') {
+    // right arrow
+    move('right');
+  }
+});
+
+function move(direction) {
+  const finalPositions = moves.reduce((position,move) => {
+    if(move === 'forward') return {lane: position.lane+1, column: position.column};
+    if(move === 'backward') return {lane: position.lane-1, column: position.column};
+    if(move === 'left') return {lane: position.lane, column: position.column-1};
+    if(move === 'right') return {lane: position.lane, column: position.column+1};
+  }, {lane: currentLane, column: currentColumn})
+
+  if (direction === 'forward') {
+    if(lanes[finalPositions.lane+1].type === 'forest' && lanes[finalPositions.lane+1].occupiedPositions.has(finalPositions.column)) return;
+    if(!stepStartTimestamp) startMoving = true;
+    addLane();
+  }
+  else if (direction === 'backward') {
+    if(finalPositions.lane === 0) return;
+    if(lanes[finalPositions.lane-1].type === 'forest' && lanes[finalPositions.lane-1].occupiedPositions.has(finalPositions.column)) return;
+    if(!stepStartTimestamp) startMoving = true;
+  }
+  else if (direction === 'left') {
+    if(finalPositions.column === 0) return;
+    if(lanes[finalPositions.lane].type === 'forest' && lanes[finalPositions.lane].occupiedPositions.has(finalPositions.column-1)) return;
+    if(!stepStartTimestamp) startMoving = true;
+  }
+  else if (direction === 'right') {
+    if(finalPositions.column === columns - 1 ) return;
+    if(lanes[finalPositions.lane].type === 'forest' && lanes[finalPositions.lane].occupiedPositions.has(finalPositions.column+1)) return;
+    if(!stepStartTimestamp) startMoving = true;
+  }
+  moves.push(direction);
+}
+
+function animate(timestamp) {
+  requestAnimationFrame( animate );
+
+  if(!previousTimestamp) previousTimestamp = timestamp;
+  const delta = timestamp - previousTimestamp;
+  previousTimestamp = timestamp;
+
+  // Animate cars and trucks moving on the lane
+  lanes.forEach(lane => {
+    if(lane.type === 'car' || lane.type === 'truck') {
+      const aBitBeforeTheBeginingOfLane = -boardWidth*zoom/2 - positionWidth*2*zoom;
+      const aBitAfterTheEndOFLane = boardWidth*zoom/2 + positionWidth*2*zoom;
+      lane.vechicles.forEach(vechicle => {
+        if(lane.direction) {
+          vechicle.position.x = vechicle.position.x < aBitBeforeTheBeginingOfLane ? aBitAfterTheEndOFLane : vechicle.position.x -= lane.speed/16*delta;
+        }else{
+          vechicle.position.x = vechicle.position.x > aBitAfterTheEndOFLane ? aBitBeforeTheBeginingOfLane : vechicle.position.x += lane.speed/16*delta;
+        }
+      });
+    }
+  });
+
+  if(startMoving) {
+    stepStartTimestamp = timestamp;
+    startMoving = false;
+  }
+
+  if(stepStartTimestamp) {
+    const moveDeltaTime = timestamp - stepStartTimestamp;
+    const moveDeltaDistance = Math.min(moveDeltaTime/stepTime,1)*positionWidth*zoom;
+    const jumpDeltaDistance = Math.sin(Math.min(moveDeltaTime/stepTime,1)*Math.PI)*8*zoom;
+    switch(moves[0]) {
+      case 'forward': {
+        const positionY = currentLane*positionWidth*zoom + moveDeltaDistance;
+        camera.position.y = initialCameraPositionY + positionY;
+        dirLight.position.y = initialDirLightPositionY + positionY;
+        chicken.position.y = positionY; // initial chicken position is 0
+
+        chicken.position.z = jumpDeltaDistance;
+        break;
+      }
+      case 'backward': {
+        positionY = currentLane*positionWidth*zoom - moveDeltaDistance
+        camera.position.y = initialCameraPositionY + positionY;
+        dirLight.position.y = initialDirLightPositionY + positionY;
+        chicken.position.y = positionY;
+
+        chicken.position.z = jumpDeltaDistance;
+        break;
+      }
+      case 'left': {
+        const positionX = (currentColumn*positionWidth+positionWidth/2)*zoom -boardWidth*zoom/2 - moveDeltaDistance;
+        camera.position.x = initialCameraPositionX + positionX;
+        dirLight.position.x = initialDirLightPositionX + positionX;
+        chicken.position.x = positionX; // initial chicken position is 0
+        chicken.position.z = jumpDeltaDistance;
+        break;
+      }
+      case 'right': {
+        const positionX = (currentColumn*positionWidth+positionWidth/2)*zoom -boardWidth*zoom/2 + moveDeltaDistance;
+        camera.position.x = initialCameraPositionX + positionX;
+        dirLight.position.x = initialDirLightPositionX + positionX;
+        chicken.position.x = positionX;
+
+        chicken.position.z = jumpDeltaDistance;
+        break;
+      }
+    }
+    // Once a step has ended
+    if(moveDeltaTime > stepTime) {
+      switch(moves[0]) {
+        case 'forward': {
+          currentLane++;
+          counterDOM.innerHTML = currentLane;
+          break;
+        }
+        case 'backward': {
+          currentLane--;
+          counterDOM.innerHTML = currentLane;
+          break;
+        }
+        case 'left': {
+          currentColumn--;
+          break;
+        }
+        case 'right': {
+          currentColumn++;
+          break;
+        }
+      }
+      moves.shift();
+      // If more steps are to be taken then restart counter otherwise stop stepping
+      stepStartTimestamp = moves.length === 0 ? null : timestamp;
+    }
+  }
+
+  // Hit test
+  if(lanes[currentLane].type === 'car' || lanes[currentLane].type === 'truck') {
+    const chickenMinX = chicken.position.x - chickenSize*zoom/2;
+    const chickenMaxX = chicken.position.x + chickenSize*zoom/2;
+    const vechicleLength = { car: 60, truck: 105}[lanes[currentLane].type];
+    lanes[currentLane].vechicles.forEach(vechicle => {
+      const carMinX = vechicle.position.x - vechicleLength*zoom/2;
+      const carMaxX = vechicle.position.x + vechicleLength*zoom/2;
+      if(chickenMaxX > carMinX && chickenMinX < carMaxX) {
+        endDOM.style.visibility = 'visible';
+      }
+    });
+
+  }
+  renderer.render( scene, camera );
+}
+
+requestAnimationFrame( animate );
